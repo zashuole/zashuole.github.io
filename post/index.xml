@@ -1,0 +1,955 @@
+<?xml version="1.0" encoding="utf-8" standalone="yes"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+    <channel>
+        <title>Posts on 杰尼龟</title>
+        <link>https://zashuole.github-io.git/post/</link>
+        <description>Recent content in Posts on 杰尼龟</description>
+        <generator>Hugo -- gohugo.io</generator>
+        <language>zh-cn</language>
+        <copyright>李东升</copyright>
+        <lastBuildDate>Sat, 19 Apr 2025 20:08:46 +0800</lastBuildDate><atom:link href="https://zashuole.github-io.git/post/index.xml" rel="self" type="application/rss+xml" /><item>
+        <title>MyFirstBlog</title>
+        <link>https://zashuole.github-io.git/p/myfirstblog/</link>
+        <pubDate>Sat, 19 Apr 2025 20:08:46 +0800</pubDate>
+        
+        <guid>https://zashuole.github-io.git/p/myfirstblog/</guid>
+        <description>&lt;h1 id=&#34;enhancing-compositional-static-analysis-with-dynamic-analysis&#34;&gt;Enhancing Compositional Static Analysis with Dynamic Analysis
+&lt;/h1&gt;&lt;h2 id=&#34;motivation&#34;&gt;motivation
+&lt;/h2&gt;&lt;p&gt;静态分析会产生假阳性（误报）的问题，虽然也会产生漏报，但是在程序分析中，一般都是追求sound，而不是complete&lt;/p&gt;
+&lt;figure&gt;
+&lt;/figure&gt;
+&lt;figure style=&#34;text-align: center;&#34;&gt;
+  &lt;img src=&#34;https://zashuole.github-io.git/images/sound and complete.png&#34; alt=&#34;图1：sound and complete&#34; style=&#34;zoom:45%;&#34; /&gt;
+  &lt;figcaption&gt;图 1：sound and complete&lt;/figcaption&gt;
+&lt;/figure&gt;
+&lt;p&gt;动态分析无法产生所有测试用例，对程序分析无法做到全覆盖，只能验证测试用例在程序中的正确性。&lt;/p&gt;
+&lt;p&gt;为此提出了动态分析和静态分析相结合的发方法，弥补了动态分析不能穷尽所有的分析情况，也弥补了静态分析产生过多的False Positive&lt;/p&gt;
+&lt;h2 id=&#34;combining-static-and-dynamic-analysis&#34;&gt;Combining Static and Dynamic Analysis
+&lt;/h2&gt;&lt;p&gt;对一个C程序来说，以链表头插法为例&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-c&#34; data-lang=&#34;c&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;kt&#34;&gt;void&lt;/span&gt; &lt;span class=&#34;nf&#34;&gt;prepend&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;Node&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;*&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;E&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;,&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;Node&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;*&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;X&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt; &lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt; &lt;span class=&#34;n&#34;&gt;E&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;-&amp;gt;&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;next&lt;/span&gt; &lt;span class=&#34;o&#34;&gt;=&lt;/span&gt; &lt;span class=&#34;n&#34;&gt;X&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt; &lt;span class=&#34;p&#34;&gt;}&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;h3 id=&#34;procedure-summaries&#34;&gt;procedure summaries
+&lt;/h3&gt;&lt;p&gt;$$
+{ P }\ C\ { Q }
+$$&lt;/p&gt;
+&lt;p&gt;如果代码 &lt;code&gt;C&lt;/code&gt; 在满足前置条件 &lt;code&gt;P&lt;/code&gt; 的时候执行，执行后就保证满足后置条件 &lt;code&gt;Q&lt;/code&gt;。&lt;/p&gt;
+&lt;p&gt;对上述C程序来说，其过程总结为
+$$
+{ E \mapsto - \ast \mathit{list}(X) }\ \texttt{prepend}(E, X)\ { \mathit{list}(E) }
+$$
+前置条件：&lt;code&gt;E&lt;/code&gt; 指向一个链表 &lt;strong&gt;X&lt;/strong&gt;，并且 &lt;code&gt;E&lt;/code&gt; 需要是某个已分配的内存单元。&lt;/p&gt;
+&lt;p&gt;后置条件：函数执行完后，&lt;code&gt;E&lt;/code&gt; 成为一个链表，表示 &lt;code&gt;E&lt;/code&gt; 现在指向一个包含原有元素和新元素的链表。&lt;/p&gt;
+&lt;p&gt;这个过程总结的意义是：如果 &lt;code&gt;prepend(E, X)&lt;/code&gt; 函数在 &lt;code&gt;E&lt;/code&gt; 指向链表 &lt;code&gt;X&lt;/code&gt; 的情况下被调用，那么执行后，&lt;code&gt;E&lt;/code&gt; 会指向一个新的链表。&lt;/p&gt;
+&lt;h3 id=&#34;dynamic-summaries&#34;&gt;Dynamic Summaries.
+&lt;/h3&gt;&lt;p&gt;在动态分析中，首先将变量映射为值
+$$
+\sigma : \text{Vars} \to \text{Vals}
+$$
+程序的运行是指程序状态的一个序列，记作 𝜎₀𝜎₁𝜎₂···，其中每个 𝜎ᵢ 都是一个具体的程序状态。这个序列属于状态集合 Σ 的一个子集，记作 Σ*。&lt;/p&gt;
+&lt;p&gt;为此，生成Dynamic Summaries
+$$
+[\sigma_I] \ f(x) \ [\sigma_O]
+$$
+Dynamic Summaries描述的是：在程序执行的过程中，给定一个输入状态 $[\sigma_I]$，经过函数 fff 处理后，会得到一个输出状态 $[\sigma_O]$。&lt;/p&gt;
+&lt;h4 id=&#34;example&#34;&gt;example
+&lt;/h4&gt;&lt;p&gt;对上述C程序不断进行链表头插法
+$$
+[E \mapsto 6 * X \mapsto {0,1,2}] , \text{prepend}(E,X) \Rightarrow [E \mapsto {6,0,1,2}]
+$$&lt;/p&gt;
+&lt;p&gt;$$
+[E \mapsto 7 * X \mapsto {6,0,1,2}] , \text{prepend}(E,X) \Rightarrow [E \mapsto {7,6,0,1,2}]
+$$&lt;/p&gt;
+&lt;p&gt;$$
+[E \mapsto 8 * X \mapsto {7,6,0,1,2}] , \text{prepend}(E,X) \Rightarrow [E \mapsto {8,7,6,0,1,2}]
+$$&lt;/p&gt;
+&lt;p&gt;$$
+[E \mapsto 9 * X \mapsto {8,7,6,0,1,2}] , \text{prepend}(E,X) \Rightarrow [E \mapsto {9,8,7,6,0,1,2}]
+$$&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-java&#34; data-lang=&#34;java&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;n&#34;&gt;Person&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;p&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;new&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;Person&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;();&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;p&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;na&#34;&gt;setName&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;Alice&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;);&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;$$
+\sigma_I : { p.name \mapsto \text{null} }
+$$&lt;/p&gt;
+&lt;p&gt;$$
+\sigma_O : { p.name \mapsto \text{&amp;ldquo;Alice&amp;rdquo;} }
+$$&lt;/p&gt;
+&lt;p&gt;$$
+\left[ \sigma_I \right] , p.setName(&amp;ldquo;Alice&amp;rdquo;) , \left[ \sigma_O \right]
+$$&lt;/p&gt;
+&lt;h3 id=&#34;static-summaries&#34;&gt;Static Summaries
+&lt;/h3&gt;&lt;p&gt;静态总结中，其中，$H_1$ 是前置条件，表示程序 &lt;code&gt;C&lt;/code&gt; 执行前程序的状态。&lt;/p&gt;
+&lt;p&gt;$H_2$ 是后置条件，表示程序 &lt;code&gt;C&lt;/code&gt; 执行后程序的状态。
+$$
+{ H_1 } , C , { H_2 }
+$$&lt;/p&gt;
+&lt;h4 id=&#34;symbolic-heap&#34;&gt;Symbolic Heap
+&lt;/h4&gt;&lt;p&gt;符号堆 $H$ 是对程序状态的抽象描述，包含了两个部分：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;等式&lt;/strong&gt;：表示程序变量之间的关系，等式的形式是 $E = F$，其中 $E$ 和 $F$ 可以是程序变量 $x$ 或其引号形式的变量 $x&amp;rsquo;$，或者是某个值 $v$。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;堆谓词&lt;/strong&gt;：描述动态分配的数据结构（例如链表）。堆谓词用于表示程序的堆内存状态。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;等式（Equalities）&lt;/strong&gt;： 符号堆中的等式表示不同程序变量之间的关系。这些等式可以是以下几种形式：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;程序变量之间的等式&lt;/strong&gt;：例如，$x = y$ 表示程序中变量 $x$ 和 $y$ 相等。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;程序变量与常量之间的等式&lt;/strong&gt;：例如，$x = 5$ 表示变量 $x$ 的值为常量 5。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;程序变量与表达式之间的等式&lt;/strong&gt;：例如，$x = y + 3$ 表示变量 $x$ 等于 $y$ 加上 3。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这些等式用于描述变量之间的相互关系和赋值规则。等式通常用来捕捉程序的静态数据流。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;堆谓词（Heap Predicates）&lt;/strong&gt;： 堆谓词描述了程序中动态分配的内存结构，例如链表、树、数组等。堆谓词用于表示堆上的动态数据结构。&lt;/p&gt;
+&lt;p&gt;常见的堆谓词包括：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;链表&lt;/strong&gt;：例如，&lt;code&gt;list(x)&lt;/code&gt; 表示堆上存在一个链表，其中 $x$ 是链表的头节点。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;树&lt;/strong&gt;：例如，&lt;code&gt;tree(x)&lt;/code&gt; 表示堆上存在一个树结构，其中 $x$ 是树的根节点。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;数组&lt;/strong&gt;：例如，&lt;code&gt;array(x, n)&lt;/code&gt; 表示堆上有一个长度为 $n$ 的数组，其起始位置为 $x$。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;指针赋值&lt;/strong&gt;：例如，&lt;code&gt;x ↦ y&lt;/code&gt; 表示堆中存在一条从 $x$ 指向 $y$ 的指针。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;堆谓词通常用于描述程序中动态分配的对象和数据结构，它们定义了内存布局、对象之间的关系以及内存指针的流动。&lt;/p&gt;
+&lt;h4 id=&#34;example-1&#34;&gt;example
+&lt;/h4&gt;&lt;p&gt;假设有一个链表操作的程序，符号堆可能会用以下方式表示程序状态：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;程序状态 1&lt;/strong&gt;：假设链表的头节点 $p$ 指向 $x$，$x$ 指向 $y$。这时符号堆可以表示为：
+$$
+{ p \mapsto x, x \mapsto y }
+$$
+这表示堆内存中有一个链表，$p$ 是链表的头节点，$x$ 和 $y$ 是后续节点。&lt;/p&gt;
+&lt;/li&gt;
+&lt;li&gt;
+&lt;p&gt;&lt;strong&gt;程序状态 2&lt;/strong&gt;：假设我们调用了 &lt;code&gt;prepend(E, X)&lt;/code&gt;，将元素 $E$​ 添加到链表的头部。链表结构应该变化为：
+$$
+{ p \mapsto E, E \mapsto x, x \mapsto y }
+$$
+这时，$E$ 成为新的头节点，原来的 $p$ 仍然指向新头节点 $E$。&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;通过符号堆，我们能在不执行程序的情况下，通过分析堆内存的变化来推断程序的行为。&lt;/p&gt;
+&lt;p&gt;应该存在一个&lt;strong&gt;抽象函数 $\alpha$&lt;/strong&gt;
+$$
+\boldsymbol{\alpha} : \boldsymbol{\Sigma} \rightarrow \mathcal{H}
+$$
+它将程序运行过程中的**具体状态对（$\sigma_I, \sigma_O$）&lt;strong&gt;映射到抽象的&lt;/strong&gt;符号堆（symbolic heap）**形式：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;$\Sigma$ 是所有&lt;strong&gt;具体状态&lt;/strong&gt;的集合；&lt;/li&gt;
+&lt;li&gt;$\mathcal{H}$ 是所有&lt;strong&gt;符号堆&lt;/strong&gt;的集合；&lt;/li&gt;
+&lt;li&gt;$[\sigma_I], f(x), [\sigma_O]$ 表示：函数 $f$ 在输入状态 $\sigma_I$ 下运行，结果是输出状态 $\sigma_O$；&lt;/li&gt;
+&lt;li&gt;${ \alpha(\sigma_I) } f(x) { \alpha(\sigma_O) }$ 表示：抽象函数 $\alpha$ 将具体状态映射为&lt;strong&gt;静态规范&lt;/strong&gt;（Hoare 三元组）中的前置条件和后置条件。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这个映射的目标是：&lt;strong&gt;用抽象表示代替具体行为&lt;/strong&gt;，从而更容易做静态分析。&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-java&#34; data-lang=&#34;java&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;n&#34;&gt;Person&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;p&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;new&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;Person&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;();&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;p&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;na&#34;&gt;name&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;Alice&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;现在关注&lt;code&gt;p.name = &amp;quot;Alice&amp;quot;&lt;/code&gt;这个&lt;strong&gt;行为&lt;/strong&gt;，其抽象表示为
+$$
+{ p.name = \text{null} } \quad p.name = &amp;ldquo;Alice&amp;rdquo; \quad { p.name = &amp;ldquo;Alice&amp;rdquo; }
+$$&lt;/p&gt;
+&lt;h3 id=&#34;the-difference-between-dynamic-summaries-and-static-summaries&#34;&gt;The difference between Dynamic Summaries and Static Summaries
+&lt;/h3&gt;&lt;p&gt;&lt;strong&gt;Dynamic Summaries&lt;/strong&gt;
+$$
+[ { p.name \mapsto \text{null} } ]\quad \text{setName(&amp;ldquo;Alice&amp;rdquo;)}\quad [ { p.name \mapsto \text{&amp;ldquo;Alice&amp;rdquo;} } ]
+$$
+这表示：“在某次运行中”，当输入状态为 p.name = null 时，调用 setName(&amp;ldquo;Alice&amp;rdquo;) 之后，状态变为 p.name = &amp;ldquo;Alice&amp;rdquo;。&lt;/p&gt;
+&lt;p&gt;📌 它只代表这个具体输入下观察到的行为，不保证对所有情况都成立。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;Static Summaries&lt;/strong&gt;
+$$
+{ p.name = \text{null} } \quad \text{setName(&amp;ldquo;Alice&amp;rdquo;)} \quad { p.name = &amp;ldquo;Alice&amp;rdquo; }
+$$
+这表示：“理论上推导出”，只要满足前提 p.name = null，那么 setName(&amp;ldquo;Alice&amp;rdquo;) 一定会把它变成 &amp;ldquo;Alice&amp;rdquo;，无论什么输入数据结构、运行路径如何。&lt;/p&gt;
+&lt;p&gt;📌 它适合用在验证和缺陷检测中，比如证明“某个字段在访问前一定初始化”。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;组合分析怎么用？&lt;/strong&gt;&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;先用动态分析生成多个$$[\sigma_I] \ f(x) \ [\sigma_O]$$；&lt;/li&gt;
+&lt;li&gt;然后用这些状态对构建函数 $$α(σ)\alpha(\sigma)α(σ)$$，将它们抽象为静态总结；&lt;/li&gt;
+&lt;li&gt;最终提升静态分析器的能力。&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;&lt;strong&gt;如何提升静态分析的准确性&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;对于&lt;strong&gt;静态分析无法处理&lt;/strong&gt;的函数 fff，执行动态分析，记录调用时的输入/输出。&lt;/p&gt;
+&lt;p&gt;每个函数执行时，我们记录一个三元组：
+$$
+(\sigma_I, f, \sigma_O)
+$$&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;$\sigma_I$：输入状态（如参数值）&lt;/li&gt;
+&lt;li&gt;$f$：函数名&lt;/li&gt;
+&lt;li&gt;$\sigma_O$​：输出状态（如返回值）&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4 id=&#34;example-2&#34;&gt;example
+&lt;/h4&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-java&#34; data-lang=&#34;java&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;kd&#34;&gt;class&lt;/span&gt; &lt;span class=&#34;nc&#34;&gt;Person&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;    &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;name&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;}&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;kd&#34;&gt;public&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;kd&#34;&gt;class&lt;/span&gt; &lt;span class=&#34;nc&#34;&gt;Main&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;    &lt;/span&gt;&lt;span class=&#34;kd&#34;&gt;public&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;kd&#34;&gt;static&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;kt&#34;&gt;void&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;nf&#34;&gt;main&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;(&lt;/span&gt;&lt;span class=&#34;n&#34;&gt;String&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;[]&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;args&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;)&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;p&#34;&gt;{&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;        &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;Person&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;p&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;k&#34;&gt;new&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;Person&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;();&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;           &lt;/span&gt;&lt;span class=&#34;c1&#34;&gt;// 状态 σ₀&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;        &lt;/span&gt;&lt;span class=&#34;n&#34;&gt;p&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;.&lt;/span&gt;&lt;span class=&#34;na&#34;&gt;name&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;w&#34;&gt; &lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;Alice&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;;&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;                  &lt;/span&gt;&lt;span class=&#34;c1&#34;&gt;// 执行 setName 动作&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;    &lt;/span&gt;&lt;span class=&#34;p&#34;&gt;}&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;w&#34;&gt;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;}&lt;/span&gt;&lt;span class=&#34;w&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;$$
+[ { p.name \mapsto \text{null} } ]\quad setName(&amp;ldquo;Alice&amp;rdquo;)\quad [ { p.name \mapsto \text{&amp;ldquo;Alice&amp;rdquo;} } ]
+$$&lt;/p&gt;
+&lt;p&gt;把具体值“抽象”成逻辑上的描述：使用抽象函数 α\alphaα 将状态转换为“符号堆”（symbolic heap）：
+$$
+{ p.name = v_1 } \quad setName(&amp;ldquo;Alice&amp;rdquo;) \quad { p.name = \text{&amp;ldquo;Alice&amp;rdquo;} }
+$$
+&lt;img src=&#34;https://zashuole.github-io.git/images/image-20250419140451075.png&#34;
+	
+	
+	
+	loading=&#34;lazy&#34;
+	
+		alt=&#34;image-20250419140451075&#34;
+	
+	
+&gt;&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;初始化静态分析结果和未分析的函数集&lt;/strong&gt;&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-fallback&#34; data-lang=&#34;fallback&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;(SSpecs, 𝑊s, UF) ← SAnalysis(CodeBase, ∅);
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;SAnalysis(CodeBase, ∅)&lt;/code&gt;：对代码库 (&lt;code&gt;CodeBase&lt;/code&gt;) 执行初始的静态分析，生成静态规格 (&lt;code&gt;SSpecs&lt;/code&gt;)、工作集 (&lt;code&gt;𝑊s&lt;/code&gt;) 和未分析的函数集 (&lt;code&gt;UF&lt;/code&gt;)。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;SSpecs&lt;/code&gt;：静态分析得到的程序规范。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;𝑊s&lt;/code&gt;：静态分析所发现的工作集，通常是关于程序中变量和状态的信息。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;UF&lt;/code&gt;：未分析的函数集，这些函数在第一次静态分析时没有被成功分析。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;初始化总工作集&lt;/strong&gt;&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-fallback&#34; data-lang=&#34;fallback&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;𝑊all ← 𝑊s;
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;𝑊all&lt;/code&gt;：总工作集，最初等于静态分析得到的工作集 &lt;code&gt;𝑊s&lt;/code&gt;。这个工作集会随着算法的进行不断累积。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;循环直到所有函数都被分析&lt;/strong&gt;&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-fallback&#34; data-lang=&#34;fallback&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;while UF ≠ ∅ do
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;while UF ≠ ∅ do&lt;/code&gt;：循环直到所有的函数都被成功分析为止。&lt;code&gt;UF&lt;/code&gt; 是未分析的函数集，直到它为空，说明所有函数都已经通过静态分析处理。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;执行动态分析并更新静态规格&lt;/strong&gt;&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-fallback&#34; data-lang=&#34;fallback&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;(DUF, 𝑊d) ← DAnalysis(CodeBase, UF);
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;SDSpecs ← αSpec(DUF);
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;(SSpecs, 𝑊′s, U′F) ← SAnalysis(CodeBase, SSpecs ∪ SDSpecs);
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;ul&gt;
+&lt;li&gt;&lt;code&gt;DAnalysis(CodeBase, UF)&lt;/code&gt;：对未分析的函数集 &lt;code&gt;UF&lt;/code&gt; 执行动态分析，得到动态分析结果 &lt;code&gt;DUF&lt;/code&gt; 和工作集 &lt;code&gt;𝑊d&lt;/code&gt;。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;αSpec(DUF)&lt;/code&gt;：将动态分析的结果 &lt;code&gt;DUF&lt;/code&gt; 转换为静态规格 &lt;code&gt;SDSpecs&lt;/code&gt;，这是通过抽象映射（&lt;code&gt;α&lt;/code&gt;）实现的。这样，动态数据就能以静态方式表达。&lt;/li&gt;
+&lt;li&gt;&lt;code&gt;SAnalysis(CodeBase, SSpecs ∪ SDSpecs)&lt;/code&gt;：对代码库进行第二次静态分析，这次使用了从动态分析中获得的静态规格 &lt;code&gt;SDSpecs&lt;/code&gt; 和原有的静态规格 &lt;code&gt;SSpecs&lt;/code&gt;。&lt;code&gt;U′F&lt;/code&gt; 是这次分析后未能成功分析的函数集。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;更新工作集&lt;/strong&gt;&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-fallback&#34; data-lang=&#34;fallback&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;𝑊all ← 𝑊all ∪ 𝑊d ∪ 𝑊′s;
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;ul&gt;
+&lt;li&gt;更新总工作集 &lt;code&gt;𝑊all&lt;/code&gt;，将当前动态分析结果 &lt;code&gt;𝑊d&lt;/code&gt; 和新的静态分析工作集 &lt;code&gt;𝑊′s&lt;/code&gt; 合并到 &lt;code&gt;𝑊all&lt;/code&gt; 中。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;检查是否收敛&lt;/strong&gt;&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-fallback&#34; data-lang=&#34;fallback&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;if UF = U′F then break;
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;ul&gt;
+&lt;li&gt;检查未分析的函数集 &lt;code&gt;UF&lt;/code&gt; 是否等于新的未分析函数集 &lt;code&gt;U′F&lt;/code&gt;。如果两者相同，说明没有新的函数需要分析，算法可以结束。如果不同，表示动态分析提供的新信息帮助静态分析处理了新的函数，继续进行下一轮分析。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;更新未分析函数集&lt;/strong&gt;&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-fallback&#34; data-lang=&#34;fallback&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;UF ← U′F;
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;ul&gt;
+&lt;li&gt;更新未分析函数集 &lt;code&gt;UF&lt;/code&gt;，使其等于当前轮次静态分析后的未分析函数集 &lt;code&gt;U′F&lt;/code&gt;，然后进入下一轮分析。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;结束循环，返回结果&lt;/strong&gt;&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-fallback&#34; data-lang=&#34;fallback&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;return 𝑊all;
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;ul&gt;
+&lt;li&gt;当 &lt;code&gt;UF&lt;/code&gt; 为空时，说明所有函数都已被成功分析，返回更新后的总工作集 &lt;code&gt;𝑊all&lt;/code&gt;。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;警告集合 $W$&lt;/p&gt;
+&lt;p&gt;$ W $ 是所有可以通过静态或动态分析报告的警告集合。这个集合包含了所有类型的警告，比如潜在的错误、未定义的行为、可能的空指针等。&lt;/p&gt;
+&lt;p&gt;动态总结的集合$ D[f] $&lt;/p&gt;
+&lt;p&gt;$ D[f] $ 是某个函数 $f(x)$ 所有可能的动态总结的集合。一个动态总结是通过动态分析收集的关于函数的运行时行为的信息。例如，函数 $f(x)$ 在不同输入下的输出、执行路径等信息。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;静态分析与动态分析&lt;/strong&gt;&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;静态分析函数&lt;/strong&gt; $ SAnalysis $ 的定义如下：
+$$
+SAnalysis : C \times 2^S \to 2^S \times 2^W \times 2^{FNames}
+$$
+其中，$ C $ 是待分析的代码库，$ 2^S $ 是函数总结的集合，表示静态分析的输入。输出为新计算出的函数规范集，警告集（即检测到的可能错误）和未分析的函数名集合。&lt;/p&gt;
+&lt;p&gt;&lt;strong&gt;动态分析函数&lt;/strong&gt; $ DAnalysis $ 的定义如下：
+$$
+DAnalysis : C \times 2^{FNames} \to 2^D \times 2^W
+$$
+其中，$ C $ 是待分析的代码库，$ 2^{FNames} $ 是未分析的函数名集合，输出为动态总结集 $ D_{UF} \subseteq D[UF] $ 和警告集。&lt;/p&gt;
+&lt;p&gt;后续论文证明了上述算法是可中止的且得到的$U_F$是最小的&lt;/p&gt;
+&lt;h2 id=&#34;dynamic-models-abstraction&#34;&gt;Dynamic Models Abstraction
+&lt;/h2&gt;&lt;p&gt;动态分析的缺点为，实际运行中观察到的函数输入/输出的动态总结可能是“过于具体”的。对于每个函数，动态分析可以观察并记录成千上万个这样的总结。直接将它们作为静态分析的规范在一般情况下是不可行的。如果一个函数 $f$ 有很多个规范，那么分析 $f$ 的调用者时可能会导致很多分支，从而降低静态分析的效率&lt;/p&gt;
+&lt;p&gt;动态分析会记录一个函数 $f$ 在实际运行中可能的输入输出行为集合，也就是：
+$$
+D_f={[\sigma_I] \ f(x) \ [\sigma_O]}
+$$&lt;/p&gt;
+&lt;p&gt;如果一个函数在不同输入下的行为非常多，比如：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;$f(1) = 2$&lt;/li&gt;
+&lt;li&gt;$f(2) = 4$&lt;/li&gt;
+&lt;li&gt;$f(3) = 6$&lt;/li&gt;
+&lt;li&gt;&amp;hellip;&lt;/li&gt;
+&lt;li&gt;$f(1000) = 2000$&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;这些行为都被动态分析记录下来，那么直接使用这些 &lt;strong&gt;原始的总结&lt;/strong&gt; 会导致静态分析中：&lt;/p&gt;
+&lt;p&gt;要枚举大量路径（每个 &lt;code&gt;f&lt;/code&gt; 的调用点会产生非常多的路径分支）&lt;/p&gt;
+&lt;p&gt;为此解决方式为&lt;/p&gt;
+&lt;p&gt;对 $D_f$ 进行 &lt;strong&gt;概括性总结（abstraction）&lt;/strong&gt;，提取出更&lt;strong&gt;紧凑&lt;/strong&gt;、更&lt;strong&gt;概括性&lt;/strong&gt;的规则，比如将上述 1000 个输入输出总结成：&lt;/p&gt;
+&lt;p&gt;当 $x &amp;gt; 0$ 时，$f(x) = x \times 2$&lt;/p&gt;
+&lt;p&gt;即用&lt;strong&gt;一条规则&lt;/strong&gt;表达出多个具体行为。&lt;/p&gt;
+&lt;p&gt;在算法1的第五行就是紧凑操作&lt;/p&gt;
+&lt;p&gt;就是将多个 $[\sigma_I] , f(&amp;hellip;) , [\sigma_O]$的实例转换为一种逻辑上的、规律性的抽象表示。&lt;/p&gt;
+&lt;h3 id=&#34;abstract-process&#34;&gt;Abstract process
+&lt;/h3&gt;&lt;p&gt;我们定义：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;$D$：所有&lt;strong&gt;动态规范&lt;/strong&gt;（dynamic specs）的集合；&lt;/li&gt;
+&lt;li&gt;$S$：所有&lt;strong&gt;静态规范&lt;/strong&gt;（static specs）的集合；&lt;/li&gt;
+&lt;li&gt;$\top$：表示一个&lt;strong&gt;非确定值（non-deterministic value）&lt;/strong&gt;；&lt;/li&gt;
+&lt;li&gt;对任意值域 $D$，扩展出 $D^\top = D \cup {\top}$。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;hr&gt;
+&lt;p&gt;接着，我们定义一个&lt;strong&gt;抽象函数&lt;/strong&gt;，用于将一组动态规范抽象成静态规范：
+$$
+α_Spec:2^D→2^S
+$$
+这个函数 $\alpha_{\text{Spec}}$ 的输入是一组动态规范，输出是相应的静态规范集合。&lt;/p&gt;
+&lt;p&gt;这个抽象函数是由一系列抽象步骤组合而成的。首先我们定义一个从具体状态到逻辑表达式的抽象函数：
+$$
+\alpha : \Sigma \to H
+$$
+它将&lt;strong&gt;具体状态&lt;/strong&gt;（如动态执行中的 I/O 值）映射为&lt;strong&gt;逻辑函数&lt;/strong&gt;（逻辑约束），以供静态规范使用。&lt;/p&gt;
+&lt;p&gt;具体地定义如下：
+$$
+\bigwedge_{x \in \text{dom}(\sigma)} x = \alpha_V(\sigma(x), 0)
+$$
+其中：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;$\sigma$ 是一个具体的状态（例如某一次函数调用的输入或输出）；&lt;/li&gt;
+&lt;li&gt;$\text{dom}(\sigma)$ 表示 $\sigma$ 中所有变量的集合；&lt;/li&gt;
+&lt;li&gt;$\alpha_V$ 是一个&lt;strong&gt;值抽象函数&lt;/strong&gt;，将具体值抽象为符号/抽象值。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;值抽象函数-alpha_v&#34;&gt;值抽象函数 $\alpha_V$
+&lt;/h3&gt;&lt;p&gt;$$
+αV:Vals×N→Vals^⊤
+$$&lt;/p&gt;
+&lt;p&gt;这个函数接受两个参数：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;一个是实际值 $v$；&lt;/li&gt;
+&lt;li&gt;一个是整数 $l$，用于追踪值的嵌套层级（如列表或元组中的嵌套）；&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;抽象函数定义如下：&lt;/p&gt;
+&lt;div style=&#34;text-align: center;&#34;&gt;
+  &lt;img src=&#34;https://zashuole.github-io.git/images/image-2025-02.png&#34; alt=&#34;image-2025-02&#34; /&gt;
+&lt;/div&gt;
+&lt;p&gt;其中：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;$\mathbb{N}$ 是 Erlang 中的整数；&lt;/li&gt;
+&lt;li&gt;$\mathbb{A}$ 是原子（atoms）集合；&lt;/li&gt;
+&lt;li&gt;$\text{EL}$ 表示列表值；&lt;/li&gt;
+&lt;li&gt;$\text{ET}$ 表示元组值；&lt;/li&gt;
+&lt;li&gt;$\top$ 表示“未知”或“非确定”的抽象值。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;hr&gt;
+&lt;h3 id=&#34;数值抽象-alpha_n&#34;&gt;数值抽象 $\alpha_N$
+&lt;/h3&gt;&lt;p&gt;定义如下：&lt;/p&gt;
+&lt;div style=&#34;text-align: center;&#34;&gt;
+  &lt;img src=&#34;https://zashuole.github-io.git/images/image-202501.png&#34; alt=&#34;image-202501&#34; /&gt;
+&lt;/div&gt;
+&lt;p&gt;也就是说，我们只显式保留前 $p$ 个自然数的值，其余的一律抽象为 $\top$（即未知）。&lt;/p&gt;
+&lt;p&gt;例子 1：数字&lt;/p&gt;
+&lt;p&gt;假设我们选择的数字是 $3$，并且定义 $p = 1$（即只跟踪 0 和 1），我们可以通过以下步骤来计算 $\alpha_V$：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;如果 $v = 3 \in \mathbb{N}$，根据定义，数字的抽象函数是 $\alpha_N$。&lt;/li&gt;
+&lt;li&gt;因为 $3$ 超出了我们设置的范围（0 到 1），所以 $\alpha_N(3) = \top$。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;所以，对于 $v = 3$ 和 $p = 1$，$\alpha_V(3, 1) = \top$。&lt;/p&gt;
+&lt;p&gt;例子 2：数字（在范围内）&lt;/p&gt;
+&lt;p&gt;假设我们选择的数字是 $0$，并且依然定义 $p = 1$，我们可以通过以下步骤来计算 $\alpha_V$：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;如果 $v = 0 \in \mathbb{N}$，我们检查 $0$ 是否在 $[0, 1]$ 范围内。&lt;/li&gt;
+&lt;li&gt;因为 $0$ 在这个范围内，$\alpha_N(0) = 0$。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;所以，对于 $v = 0$ 和 $p = 1$，$\alpha_V(0, 1) = 0$。&lt;/p&gt;
+&lt;p&gt;例子 3：列表&lt;/p&gt;
+&lt;p&gt;假设我们选择了一个包含数字的列表，如 $[3, 5]$，并且定义 $l = 1$（表示列表的嵌套层级）。我们可以通过以下步骤来计算 $\alpha_V$：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;由于 $[3, 5] \in \text{EL}$（Erlang 列表），我们使用 $\alpha_{\text{list}}(v, l)$ 进行抽象。&lt;/li&gt;
+&lt;li&gt;假设 $\alpha_{\text{list}}$ 采用某种策略来处理列表的嵌套，在这个例子中，它可能返回一个表示该列表的抽象值，或者如果列表中有数字 $3$ 和 $5$，它们的抽象值可能是 $\top$，因为这两个数字可能会被抽象化为不可知的值。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;例如，如果 $\alpha_{\text{list}}$ 处理数字时也只跟踪 $0$ 和 $1$，那么它可能返回一个表示该列表抽象信息的结构。&lt;/p&gt;
+&lt;p&gt;所以，对于列表 $[3, 5]$ 和嵌套层级 $l = 1$，$\alpha_V([3, 5], 1)$ 可能会返回某个抽象的表示（例如 $\top$）。&lt;/p&gt;
+&lt;p&gt;例子 4：元组&lt;/p&gt;
+&lt;p&gt;假设我们选择了一个元组 &lt;code&gt;{&amp;quot;hello&amp;quot;, 3}&lt;/code&gt;，并且定义 $l = 1$（表示元组的嵌套层级）。我们可以通过以下步骤来计算 $\alpha_V$：&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;由于 ${&amp;ldquo;hello&amp;rdquo;, 3} \in \text{ET}$（Erlang 元组），我们使用 $\alpha_{\text{tuple}}(v, l)$ 进行抽象。&lt;/li&gt;
+&lt;li&gt;假设 $\alpha_{\text{tuple}}$ 对元组中的每个元素（&lt;code&gt;&amp;quot;hello&amp;quot;&lt;/code&gt; 和 &lt;code&gt;3&lt;/code&gt;）分别进行抽象。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;例如，&lt;code&gt;&amp;quot;hello&amp;quot;&lt;/code&gt; 是一个原子，可能会被抽象为某个原子的值，而 $3$ 是一个数字，可能会根据我们设置的范围（$p = 1$）被抽象为 $\top$。&lt;/p&gt;
+&lt;p&gt;所以，对于元组 &lt;code&gt;{&amp;quot;hello&amp;quot;, 3}&lt;/code&gt; 和嵌套层级 $l = 1$，$\alpha_V({&amp;ldquo;hello&amp;rdquo;, 3}, 1)$ 可能会返回一个包含原子和抽象数字的结果，例如 ${&amp;ldquo;hello&amp;rdquo;, \top}$。&lt;/p&gt;
+&lt;h2 id=&#34;over-approximation-and-under-approximation&#34;&gt;Over-approximation and Under-approximation
+&lt;/h2&gt;&lt;p&gt;&lt;strong&gt;定理 4.1&lt;/strong&gt; 讲述了抽象函数$\alpha$ 是 &lt;strong&gt;sound&lt;/strong&gt; 的，意思是对每一个状态 Σ$σ∈Σ$，都有 $σ∈γ(α(σ))$，其中 $γ$是一个操作，通常代表某种变换或者约束的应用。&lt;/p&gt;
+&lt;p&gt;这意味着应用抽象函数 $\alpha$ 后的结果总能覆盖原始状态，抽象不会“丢失”信息，因此 &lt;strong&gt;sound&lt;/strong&gt; 确保了抽象的一致性，避免了由于抽象操作而引入的错误。
+$$
+\alpha[\sigma_I] f(x) [\sigma_O] = {\sigma_I} f(x) {\alpha(\sigma_O)}
+$$
+这个公式表示在函数 $f(x)$的调用过程中，只对 &lt;strong&gt;输出状态&lt;/strong&gt; $σ_O$ 进行抽象，而 &lt;strong&gt;输入状态&lt;/strong&gt; $\sigma_I $保持不变。这个抽象方法适用于 &lt;strong&gt;过度近似&lt;/strong&gt;（over-approximation）分析，即函数调用后的输出状态是经过抽象处理的。
+$$
+\alpha[\sigma_I] f(x) [\sigma_O] = {\alpha(\sigma_I)} f(x) {\sigma_O}
+$$
+这个公式则表示在函数调用前对 &lt;strong&gt;输入状态&lt;/strong&gt;$ sigma_I $进行抽象，而 &lt;strong&gt;输出状态&lt;/strong&gt;$ \sigma_O$ 保持不变。这种抽象方法在输入状态不确定或不完全时可能有助于减少分析的复杂性，但同样也可能引入错误的分析结果。&lt;/p&gt;
+&lt;p&gt;$$
+\alpha[\sigma_I] f(x) [\sigma_O] = {\alpha(\sigma_I)} f(x) {\alpha(\sigma_O)}
+$$
+这是文章中使用的抽象方法，在 &lt;strong&gt;输入状态&lt;/strong&gt; $\sigma_I$和 &lt;strong&gt;输出状态&lt;/strong&gt; $\sigma_O $都进行抽象。这种方法可以将输入和输出的动态总结同时抽象化，但会引入较高的误差和潜在的 &lt;strong&gt;false positives&lt;/strong&gt;，因为输入和输出的所有信息都被抽象为近似值。&lt;/p&gt;
+&lt;p&gt;关于 &lt;strong&gt;Over-approximation&lt;/strong&gt; 和 &lt;strong&gt;Under-approximation&lt;/strong&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;&lt;strong&gt;Over-approximation&lt;/strong&gt;（过度近似）：对系统的行为进行了“扩展”，即使在某些情况下可能并不完全准确。过度近似的好处是它能确保所有可能的行为都被考虑，但也容易导致误报。&lt;/li&gt;
+&lt;li&gt;&lt;strong&gt;Under-approximation&lt;/strong&gt;（欠近似）：对系统行为的分析太过严格，遗漏了一些可能的情况。欠近似能避免误报，但可能错过一些实际的行为。&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h3 id=&#34;example-3&#34;&gt;example
+&lt;/h3&gt;&lt;p&gt;集合 $D$ 定义如下：&lt;/p&gt;
+&lt;p&gt;$$
+[E \mapsto 6 * X \mapsto {0,1,2}] , \text{prepend}(E,X) \Rightarrow [E \mapsto {6,0,1,2}]
+$$&lt;/p&gt;
+&lt;p&gt;$$
+[E \mapsto 7 * X \mapsto {6,0,1,2}] , \text{prepend}(E,X) \Rightarrow [E \mapsto {7,6,0,1,2}]
+$$&lt;/p&gt;
+&lt;p&gt;$$
+[E \mapsto 8 * X \mapsto {7,6,0,1,2}] , \text{prepend}(E,X) \Rightarrow [E \mapsto {8,7,6,0,1,2}]
+$$&lt;/p&gt;
+&lt;p&gt;$$
+[E \mapsto 9 * X \mapsto {8,7,6,0,1,2}] , \text{prepend}(E,X) \Rightarrow [E \mapsto {9,8,7,6,0,1,2}]
+$$&lt;/p&gt;
+&lt;p&gt;对集合D进行采用抽象函数进行处理，设置的范围为（0，1）,经过抽象函数处理的$𝛼𝑆𝑝𝑒𝑐(𝐷)$如下&lt;/p&gt;
+&lt;p&gt;$$
+[E \mapsto \top * X \mapsto {0,1,\top}] , \text{prepend}(E,X) \Rightarrow [E \mapsto {\top,0,\top}]
+$$&lt;/p&gt;
+&lt;p&gt;$$
+[E \mapsto \top * X \mapsto {\top,0,\top}] , \text{prepend}(E,X) \Rightarrow [E \mapsto {\top,\top,\top}]
+$$&lt;/p&gt;
+&lt;p&gt;$$
+[E \mapsto \top * X \mapsto {\top,\top,\top}] , \text{prepend}(E,X) \Rightarrow [E \mapsto {\top,\top,\top}]
+$$&lt;/p&gt;
+&lt;p&gt;$$
+[E \mapsto \top * X \mapsto {\top,\top,\top}] , \text{prepend}(E,X) \Rightarrow [E \mapsto {\top,\top,\top}]
+$$&lt;/p&gt;
+&lt;p&gt;最后将动态规格映射成静态规格
+$$
+\alpha_{Spec}(D) = { { \alpha(\sigma_I) } , f(x) , { \alpha(\sigma_O) } \mid [\sigma_I] f(x) [\sigma_O] \in D } ]
+$$
+$D$ 是一堆 &lt;strong&gt;动态的规格&lt;/strong&gt;（执行观测）；&lt;/p&gt;
+&lt;p&gt;每一个动态规格都形如：$[\sigma_I] f(x) [\sigma_O]$，表示：当输入状态是 $\sigma_I$，执行 $f(x)$，结果是 $\sigma_O$；&lt;/p&gt;
+&lt;p&gt;对输入输出都做抽象，形成静态规则：${ \alpha(\sigma_I) } f(x) { \alpha(\sigma_O) }$；&lt;/p&gt;
+&lt;p&gt;最终 $\alpha_{Spec}(D)$ 得到的是这些抽象规格组成的集合。&lt;/p&gt;
+</description>
+        </item>
+        <item>
+        <title>Chinese Test</title>
+        <link>https://zashuole.github-io.git/p/test-chinese/</link>
+        <pubDate>Wed, 09 Sep 2020 00:00:00 +0000</pubDate>
+        
+        <guid>https://zashuole.github-io.git/p/test-chinese/</guid>
+        <description>&lt;img src="https://zashuole.github-io.git/p/test-chinese/helena-hertz-wWZzXlDpMog-unsplash.jpg" alt="Featured image of post Chinese Test" /&gt;&lt;h2 id=&#34;正文测试&#34;&gt;正文测试
+&lt;/h2&gt;&lt;p&gt;而这些并不是完全重要，更加重要的问题是， 带着这些问题，我们来审视一下学生会退会。 既然如何， 对我个人而言，学生会退会不仅仅是一个重大的事件，还可能会改变我的人生。 我们不得不面对一个非常尴尬的事实，那就是， 可是，即使是这样，学生会退会的出现仍然代表了一定的意义。 学生会退会，发生了会如何，不发生又会如何。 经过上述讨论， 生活中，若学生会退会出现了，我们就不得不考虑它出现了的事实。 学生会退会，到底应该如何实现。 这样看来， 在这种困难的抉择下，本人思来想去，寝食难安。 对我个人而言，学生会退会不仅仅是一个重大的事件，还可能会改变我的人生。 就我个人来说，学生会退会对我的意义，不能不说非常重大。 莎士比亚曾经提到过，人的一生是短的，但如果卑劣地过这一生，就太长了。这似乎解答了我的疑惑。 莫扎特说过一句富有哲理的话，谁和我一样用功，谁就会和我一样成功。这启发了我， 对我个人而言，学生会退会不仅仅是一个重大的事件，还可能会改变我的人生。 学生会退会，到底应该如何实现。 一般来说， 从这个角度来看， 这种事实对本人来说意义重大，相信对这个世界也是有一定意义的。 在这种困难的抉择下，本人思来想去，寝食难安。 了解清楚学生会退会到底是一种怎么样的存在，是解决一切问题的关键。 一般来说， 生活中，若学生会退会出现了，我们就不得不考虑它出现了的事实。 问题的关键究竟为何？ 而这些并不是完全重要，更加重要的问题是。&lt;/p&gt;
+&lt;p&gt;奥斯特洛夫斯基曾经说过，共同的事业，共同的斗争，可以使人们产生忍受一切的力量。　带着这句话，我们还要更加慎重的审视这个问题： 一般来讲，我们都必须务必慎重的考虑考虑。 既然如此， 这种事实对本人来说意义重大，相信对这个世界也是有一定意义的。 带着这些问题，我们来审视一下学生会退会。 我认为， 我认为， 在这种困难的抉择下，本人思来想去，寝食难安。 问题的关键究竟为何？ 每个人都不得不面对这些问题。 在面对这种问题时， 要想清楚，学生会退会，到底是一种怎么样的存在。 我认为， 既然如此， 每个人都不得不面对这些问题。 在面对这种问题时， 那么， 我认为， 学生会退会因何而发生。&lt;/p&gt;
+&lt;h2 id=&#34;引用&#34;&gt;引用
+&lt;/h2&gt;&lt;blockquote&gt;
+&lt;p&gt;思念是最暖的忧伤像一双翅膀&lt;br&gt;
+让我停不了飞不远在过往游荡&lt;br&gt;
+不告而别的你 就算为了我着想&lt;br&gt;
+这么沉痛的呵护 我怎么能翱翔&lt;/p&gt;
+&lt;p&gt;&lt;em&gt;&lt;a class=&#34;link&#34; href=&#34;https://www.youtube.com/watch?v=3aypp_YlBzI&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;最暖的憂傷 - 田馥甄&lt;/a&gt;&lt;/em&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;h2 id=&#34;图片&#34;&gt;图片
+&lt;/h2&gt;&lt;p&gt;&lt;img src=&#34;https://zashuole.github-io.git/p/test-chinese/florian-klauer-nptLmg6jqDo-unsplash.jpg&#34;
+	width=&#34;667&#34;
+	height=&#34;1000&#34;
+	srcset=&#34;https://zashuole.github-io.git/p/test-chinese/florian-klauer-nptLmg6jqDo-unsplash_hu13768363498926278726.jpg 480w, https://zashuole.github-io.git/p/test-chinese/florian-klauer-nptLmg6jqDo-unsplash_hu13380208884366868750.jpg 1024w&#34;
+	loading=&#34;lazy&#34;
+	
+		alt=&#34;Photo by Florian Klauer on Unsplash&#34;
+	
+	
+		class=&#34;gallery-image&#34; 
+		data-flex-grow=&#34;66&#34;
+		data-flex-basis=&#34;160px&#34;
+	
+&gt;  &lt;img src=&#34;https://zashuole.github-io.git/p/test-chinese/luca-bravo-alS7ewQ41M8-unsplash.jpg&#34;
+	width=&#34;1000&#34;
+	height=&#34;667&#34;
+	srcset=&#34;https://zashuole.github-io.git/p/test-chinese/luca-bravo-alS7ewQ41M8-unsplash_hu1712544344331247820.jpg 480w, https://zashuole.github-io.git/p/test-chinese/luca-bravo-alS7ewQ41M8-unsplash_hu12475395149584884402.jpg 1024w&#34;
+	loading=&#34;lazy&#34;
+	
+		alt=&#34;Photo by Luca Bravo on Unsplash&#34;
+	
+	
+		class=&#34;gallery-image&#34; 
+		data-flex-grow=&#34;149&#34;
+		data-flex-basis=&#34;359px&#34;
+	
+&gt;&lt;/p&gt;
+&lt;p&gt;&lt;img src=&#34;https://zashuole.github-io.git/p/test-chinese/helena-hertz-wWZzXlDpMog-unsplash.jpg&#34;
+	width=&#34;1000&#34;
+	height=&#34;750&#34;
+	srcset=&#34;https://zashuole.github-io.git/p/test-chinese/helena-hertz-wWZzXlDpMog-unsplash_hu8363585391189779282.jpg 480w, https://zashuole.github-io.git/p/test-chinese/helena-hertz-wWZzXlDpMog-unsplash_hu15102473124145023839.jpg 1024w&#34;
+	loading=&#34;lazy&#34;
+	
+		alt=&#34;Photo by Helena Hertz on Unsplash&#34;
+	
+	
+		class=&#34;gallery-image&#34; 
+		data-flex-grow=&#34;133&#34;
+		data-flex-basis=&#34;320px&#34;
+	
+&gt;  &lt;img src=&#34;https://zashuole.github-io.git/p/test-chinese/hudai-gayiran-3Od_VKcDEAA-unsplash.jpg&#34;
+	width=&#34;667&#34;
+	height=&#34;1000&#34;
+	srcset=&#34;https://zashuole.github-io.git/p/test-chinese/hudai-gayiran-3Od_VKcDEAA-unsplash_hu15886963791847885497.jpg 480w, https://zashuole.github-io.git/p/test-chinese/hudai-gayiran-3Od_VKcDEAA-unsplash_hu11726476772237334826.jpg 1024w&#34;
+	loading=&#34;lazy&#34;
+	
+		alt=&#34;Photo by Hudai Gayiran on Unsplash&#34;
+	
+	
+		class=&#34;gallery-image&#34; 
+		data-flex-grow=&#34;66&#34;
+		data-flex-basis=&#34;160px&#34;
+	
+&gt;&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-markdown&#34; data-lang=&#34;markdown&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;![&lt;span class=&#34;nt&#34;&gt;Photo by Florian Klauer on Unsplash&lt;/span&gt;](&lt;span class=&#34;na&#34;&gt;florian-klauer-nptLmg6jqDo-unsplash.jpg&lt;/span&gt;)  ![&lt;span class=&#34;nt&#34;&gt;Photo by Luca Bravo on Unsplash&lt;/span&gt;](&lt;span class=&#34;na&#34;&gt;luca-bravo-alS7ewQ41M8-unsplash.jpg&lt;/span&gt;) 
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;![&lt;span class=&#34;nt&#34;&gt;Photo by Helena Hertz on Unsplash&lt;/span&gt;](&lt;span class=&#34;na&#34;&gt;helena-hertz-wWZzXlDpMog-unsplash.jpg&lt;/span&gt;)  ![&lt;span class=&#34;nt&#34;&gt;Photo by Hudai Gayiran on Unsplash&lt;/span&gt;](&lt;span class=&#34;na&#34;&gt;hudai-gayiran-3Od_VKcDEAA-unsplash.jpg&lt;/span&gt;)
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;p&gt;相册语法来自 &lt;a class=&#34;link&#34; href=&#34;https://typlog.com/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Typlog&lt;/a&gt;&lt;/p&gt;
+</description>
+        </item>
+        <item>
+        <title>Markdown Syntax Guide</title>
+        <link>https://zashuole.github-io.git/p/markdown-syntax-guide/</link>
+        <pubDate>Mon, 11 Mar 2019 00:00:00 +0000</pubDate>
+        
+        <guid>https://zashuole.github-io.git/p/markdown-syntax-guide/</guid>
+        <description>&lt;img src="https://zashuole.github-io.git/p/markdown-syntax-guide/pawel-czerwinski-8uZPynIu-rQ-unsplash.jpg" alt="Featured image of post Markdown Syntax Guide" /&gt;&lt;p&gt;This article offers a sample of basic Markdown syntax that can be used in Hugo content files, also it shows whether basic HTML elements are decorated with CSS in a Hugo theme.&lt;/p&gt;
+&lt;h2 id=&#34;headings&#34;&gt;Headings
+&lt;/h2&gt;&lt;p&gt;The following HTML &lt;code&gt;&amp;lt;h1&amp;gt;&lt;/code&gt;—&lt;code&gt;&amp;lt;h6&amp;gt;&lt;/code&gt; elements represent six levels of section headings. &lt;code&gt;&amp;lt;h1&amp;gt;&lt;/code&gt; is the highest section level while &lt;code&gt;&amp;lt;h6&amp;gt;&lt;/code&gt; is the lowest.&lt;/p&gt;
+&lt;h1 id=&#34;h1&#34;&gt;H1
+&lt;/h1&gt;&lt;h2 id=&#34;h2&#34;&gt;H2
+&lt;/h2&gt;&lt;h3 id=&#34;h3&#34;&gt;H3
+&lt;/h3&gt;&lt;h4 id=&#34;h4&#34;&gt;H4
+&lt;/h4&gt;&lt;h5 id=&#34;h5&#34;&gt;H5
+&lt;/h5&gt;&lt;h6 id=&#34;h6&#34;&gt;H6
+&lt;/h6&gt;&lt;h2 id=&#34;paragraph&#34;&gt;Paragraph
+&lt;/h2&gt;&lt;p&gt;Xerum, quo qui aut unt expliquam qui dolut labo. Aque venitatiusda cum, voluptionse latur sitiae dolessi aut parist aut dollo enim qui voluptate ma dolestendit peritin re plis aut quas inctum laceat est volestemque commosa as cus endigna tectur, offic to cor sequas etum rerum idem sintibus eiur? Quianimin porecus evelectur, cum que nis nust voloribus ratem aut omnimi, sitatur? Quiatem. Nam, omnis sum am facea corem alique molestrunt et eos evelece arcillit ut aut eos eos nus, sin conecerem erum fuga. Ri oditatquam, ad quibus unda veliamenimin cusam et facea ipsamus es exerum sitate dolores editium rerore eost, temped molorro ratiae volorro te reribus dolorer sperchicium faceata tiustia prat.&lt;/p&gt;
+&lt;p&gt;Itatur? Quiatae cullecum rem ent aut odis in re eossequodi nonsequ idebis ne sapicia is sinveli squiatum, core et que aut hariosam ex eat.&lt;/p&gt;
+&lt;h2 id=&#34;blockquotes&#34;&gt;Blockquotes
+&lt;/h2&gt;&lt;p&gt;The blockquote element represents content that is quoted from another source, optionally with a citation which must be within a &lt;code&gt;footer&lt;/code&gt; or &lt;code&gt;cite&lt;/code&gt; element, and optionally with in-line changes such as annotations and abbreviations.&lt;/p&gt;
+&lt;h4 id=&#34;blockquote-without-attribution&#34;&gt;Blockquote without attribution
+&lt;/h4&gt;&lt;blockquote&gt;
+&lt;p&gt;Tiam, ad mint andaepu dandae nostion secatur sequo quae.
+&lt;strong&gt;Note&lt;/strong&gt; that you can use &lt;em&gt;Markdown syntax&lt;/em&gt; within a blockquote.&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;h4 id=&#34;blockquote-with-attribution&#34;&gt;Blockquote with attribution
+&lt;/h4&gt;&lt;blockquote&gt;
+&lt;p&gt;Don&amp;rsquo;t communicate by sharing memory, share memory by communicating.&lt;br&gt;
+— &lt;cite&gt;Rob Pike&lt;sup id=&#34;fnref:1&#34;&gt;&lt;a href=&#34;#fn:1&#34; class=&#34;footnote-ref&#34; role=&#34;doc-noteref&#34;&gt;1&lt;/a&gt;&lt;/sup&gt;&lt;/cite&gt;&lt;/p&gt;
+&lt;/blockquote&gt;
+&lt;h2 id=&#34;tables&#34;&gt;Tables
+&lt;/h2&gt;&lt;p&gt;Tables aren&amp;rsquo;t part of the core Markdown spec, but Hugo supports supports them out-of-the-box.&lt;/p&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Name&lt;/th&gt;
+&lt;th&gt;Age&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;Bob&lt;/td&gt;
+&lt;td&gt;27&lt;/td&gt;
+&lt;/tr&gt;
+&lt;tr&gt;
+&lt;td&gt;Alice&lt;/td&gt;
+&lt;td&gt;23&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;h4 id=&#34;inline-markdown-within-tables&#34;&gt;Inline Markdown within tables
+&lt;/h4&gt;&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;Italics&lt;/th&gt;
+&lt;th&gt;Bold&lt;/th&gt;
+&lt;th&gt;Code&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;&lt;em&gt;italics&lt;/em&gt;&lt;/td&gt;
+&lt;td&gt;&lt;strong&gt;bold&lt;/strong&gt;&lt;/td&gt;
+&lt;td&gt;&lt;code&gt;code&lt;/code&gt;&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;table&gt;
+&lt;thead&gt;
+&lt;tr&gt;
+&lt;th&gt;A&lt;/th&gt;
+&lt;th&gt;B&lt;/th&gt;
+&lt;th&gt;C&lt;/th&gt;
+&lt;th&gt;D&lt;/th&gt;
+&lt;th&gt;E&lt;/th&gt;
+&lt;th&gt;F&lt;/th&gt;
+&lt;/tr&gt;
+&lt;/thead&gt;
+&lt;tbody&gt;
+&lt;tr&gt;
+&lt;td&gt;Lorem ipsum dolor sit amet, consectetur adipiscing elit.&lt;/td&gt;
+&lt;td&gt;Phasellus ultricies, sapien non euismod aliquam, dui ligula tincidunt odio, at accumsan nulla sapien eget ex.&lt;/td&gt;
+&lt;td&gt;Proin eleifend dictum ipsum, non euismod ipsum pulvinar et. Vivamus sollicitudin, quam in pulvinar aliquam, metus elit pretium purus&lt;/td&gt;
+&lt;td&gt;Proin sit amet velit nec enim imperdiet vehicula.&lt;/td&gt;
+&lt;td&gt;Ut bibendum vestibulum quam, eu egestas turpis gravida nec&lt;/td&gt;
+&lt;td&gt;Sed scelerisque nec turpis vel viverra. Vivamus vitae pretium sapien&lt;/td&gt;
+&lt;/tr&gt;
+&lt;/tbody&gt;
+&lt;/table&gt;
+&lt;h2 id=&#34;code-blocks&#34;&gt;Code Blocks
+&lt;/h2&gt;&lt;h4 id=&#34;code-block-with-backticks&#34;&gt;Code block with backticks
+&lt;/h4&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-html&#34; data-lang=&#34;html&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;cp&#34;&gt;&amp;lt;!doctype html&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;html&lt;/span&gt; &lt;span class=&#34;na&#34;&gt;lang&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;en&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;head&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;p&#34;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;meta&lt;/span&gt; &lt;span class=&#34;na&#34;&gt;charset&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;utf-8&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;p&#34;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;title&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;&amp;gt;&lt;/span&gt;Example HTML5 Document&lt;span class=&#34;p&#34;&gt;&amp;lt;/&lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;title&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;&amp;lt;/&lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;head&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;body&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;p&#34;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;p&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;&amp;gt;&lt;/span&gt;Test&lt;span class=&#34;p&#34;&gt;&amp;lt;/&lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;p&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;&amp;lt;/&lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;body&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;&amp;lt;/&lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;html&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;h4 id=&#34;code-block-indented-with-four-spaces&#34;&gt;Code block indented with four spaces
+&lt;/h4&gt;&lt;pre&gt;&lt;code&gt;&amp;lt;!doctype html&amp;gt;
+&amp;lt;html lang=&amp;quot;en&amp;quot;&amp;gt;
+&amp;lt;head&amp;gt;
+  &amp;lt;meta charset=&amp;quot;utf-8&amp;quot;&amp;gt;
+  &amp;lt;title&amp;gt;Example HTML5 Document&amp;lt;/title&amp;gt;
+&amp;lt;/head&amp;gt;
+&amp;lt;body&amp;gt;
+  &amp;lt;p&amp;gt;Test&amp;lt;/p&amp;gt;
+&amp;lt;/body&amp;gt;
+&amp;lt;/html&amp;gt;
+&lt;/code&gt;&lt;/pre&gt;
+&lt;h4 id=&#34;code-block-with-hugos-internal-highlight-shortcode&#34;&gt;Code block with Hugo&amp;rsquo;s internal highlight shortcode
+&lt;/h4&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt; 1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 5
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 6
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 7
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 8
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt; 9
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;10
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-html&#34; data-lang=&#34;html&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;cp&#34;&gt;&amp;lt;!doctype html&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;html&lt;/span&gt; &lt;span class=&#34;na&#34;&gt;lang&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;en&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;head&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;p&#34;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;meta&lt;/span&gt; &lt;span class=&#34;na&#34;&gt;charset&lt;/span&gt;&lt;span class=&#34;o&#34;&gt;=&lt;/span&gt;&lt;span class=&#34;s&#34;&gt;&amp;#34;utf-8&amp;#34;&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;p&#34;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;title&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;&amp;gt;&lt;/span&gt;Example HTML5 Document&lt;span class=&#34;p&#34;&gt;&amp;lt;/&lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;title&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;&amp;lt;/&lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;head&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;body&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  &lt;span class=&#34;p&#34;&gt;&amp;lt;&lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;p&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;&amp;gt;&lt;/span&gt;Test&lt;span class=&#34;p&#34;&gt;&amp;lt;/&lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;p&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;&amp;lt;/&lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;body&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;&amp;gt;&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;p&#34;&gt;&amp;lt;/&lt;/span&gt;&lt;span class=&#34;nt&#34;&gt;html&lt;/span&gt;&lt;span class=&#34;p&#34;&gt;&amp;gt;&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;
+&lt;h4 id=&#34;diff-code-block&#34;&gt;Diff code block
+&lt;/h4&gt;&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;4
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;5
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-diff&#34; data-lang=&#34;diff&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;[dependencies.bevy]
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;git = &amp;#34;https://github.com/bevyengine/bevy&amp;#34;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;rev = &amp;#34;11f52b8c72fc3a568e8bb4a4cd1f3eb025ac2e13&amp;#34;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;gd&#34;&gt;- features = [&amp;#34;dynamic&amp;#34;]
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;gd&#34;&gt;&lt;/span&gt;&lt;span class=&#34;gi&#34;&gt;+ features = [&amp;#34;jpeg&amp;#34;, &amp;#34;dynamic&amp;#34;]
+&lt;/span&gt;&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;h2 id=&#34;list-types&#34;&gt;List Types
+&lt;/h2&gt;&lt;h4 id=&#34;ordered-list&#34;&gt;Ordered List
+&lt;/h4&gt;&lt;ol&gt;
+&lt;li&gt;First item&lt;/li&gt;
+&lt;li&gt;Second item&lt;/li&gt;
+&lt;li&gt;Third item&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h4 id=&#34;unordered-list&#34;&gt;Unordered List
+&lt;/h4&gt;&lt;ul&gt;
+&lt;li&gt;List item&lt;/li&gt;
+&lt;li&gt;Another item&lt;/li&gt;
+&lt;li&gt;And another item&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h4 id=&#34;nested-list&#34;&gt;Nested list
+&lt;/h4&gt;&lt;ul&gt;
+&lt;li&gt;Fruit
+&lt;ul&gt;
+&lt;li&gt;Apple&lt;/li&gt;
+&lt;li&gt;Orange&lt;/li&gt;
+&lt;li&gt;Banana&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;li&gt;Dairy
+&lt;ul&gt;
+&lt;li&gt;Milk&lt;/li&gt;
+&lt;li&gt;Cheese&lt;/li&gt;
+&lt;/ul&gt;
+&lt;/li&gt;
+&lt;/ul&gt;
+&lt;h2 id=&#34;other-elements--abbr-sub-sup-kbd-mark&#34;&gt;Other Elements — abbr, sub, sup, kbd, mark
+&lt;/h2&gt;&lt;p&gt;&lt;abbr title=&#34;Graphics Interchange Format&#34;&gt;GIF&lt;/abbr&gt; is a bitmap image format.&lt;/p&gt;
+&lt;p&gt;H&lt;sub&gt;2&lt;/sub&gt;O&lt;/p&gt;
+&lt;p&gt;X&lt;sup&gt;n&lt;/sup&gt; + Y&lt;sup&gt;n&lt;/sup&gt; = Z&lt;sup&gt;n&lt;/sup&gt;&lt;/p&gt;
+&lt;p&gt;Press &lt;kbd&gt;CTRL&lt;/kbd&gt; + &lt;kbd&gt;ALT&lt;/kbd&gt; + &lt;kbd&gt;Delete&lt;/kbd&gt; to end the session.&lt;/p&gt;
+&lt;p&gt;Most &lt;mark&gt;salamanders&lt;/mark&gt; are nocturnal, and hunt for insects, worms, and other small creatures.&lt;/p&gt;
+&lt;h2 id=&#34;hyperlinked-image&#34;&gt;Hyperlinked image
+&lt;/h2&gt;&lt;p&gt;&lt;a class=&#34;link&#34; href=&#34;https://google.com&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;&lt;img src=&#34;https://www.google.com/images/branding/googlelogo/1x/googlelogo_light_color_272x92dp.png&#34;
+	
+	
+	
+	loading=&#34;lazy&#34;
+	
+		alt=&#34;Google&#34;
+	
+	
+&gt;&lt;/a&gt;&lt;/p&gt;
+&lt;div class=&#34;footnotes&#34; role=&#34;doc-endnotes&#34;&gt;
+&lt;hr&gt;
+&lt;ol&gt;
+&lt;li id=&#34;fn:1&#34;&gt;
+&lt;p&gt;The above quote is excerpted from Rob Pike&amp;rsquo;s &lt;a class=&#34;link&#34; href=&#34;https://www.youtube.com/watch?v=PAAkCSZUG1c&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;talk&lt;/a&gt; during Gopherfest, November 18, 2015.&amp;#160;&lt;a href=&#34;#fnref:1&#34; class=&#34;footnote-backref&#34; role=&#34;doc-backlink&#34;&gt;&amp;#x21a9;&amp;#xfe0e;&lt;/a&gt;&lt;/p&gt;
+&lt;/li&gt;
+&lt;/ol&gt;
+&lt;/div&gt;</description>
+        </item>
+        <item>
+        <title>Placeholder Text</title>
+        <link>https://zashuole.github-io.git/p/placeholder-text/</link>
+        <pubDate>Sat, 09 Mar 2019 00:00:00 +0000</pubDate>
+        
+        <guid>https://zashuole.github-io.git/p/placeholder-text/</guid>
+        <description>&lt;img src="https://zashuole.github-io.git/p/placeholder-text/matt-le-SJSpo9hQf7s-unsplash.jpg" alt="Featured image of post Placeholder Text" /&gt;&lt;p&gt;Lorem est tota propiore conpellat pectoribus de pectora summo.&lt;/p&gt;
+&lt;p&gt;Redit teque digerit hominumque toris verebor lumina non cervice subde tollit usus habet Arctonque, furores quas nec ferunt. Quoque montibus nunc caluere tempus inhospita parcite confusaque translucet patri vestro qui optatis lumine cognoscere flos nubis! Fronde ipsamque patulos Dryopen deorum.&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;Exierant elisi ambit vivere dedere&lt;/li&gt;
+&lt;li&gt;Duce pollice&lt;/li&gt;
+&lt;li&gt;Eris modo&lt;/li&gt;
+&lt;li&gt;Spargitque ferrea quos palude&lt;/li&gt;
+&lt;/ol&gt;
+&lt;p&gt;Rursus nulli murmur; hastile inridet ut ab gravi sententia! Nomine potitus silentia flumen, sustinet placuit petis in dilapsa erat sunt. Atria tractus malis.&lt;/p&gt;
+&lt;ol&gt;
+&lt;li&gt;Comas hunc haec pietate fetum procerum dixit&lt;/li&gt;
+&lt;li&gt;Post torum vates letum Tiresia&lt;/li&gt;
+&lt;li&gt;Flumen querellas&lt;/li&gt;
+&lt;li&gt;Arcanaque montibus omnes&lt;/li&gt;
+&lt;li&gt;Quidem et&lt;/li&gt;
+&lt;/ol&gt;
+&lt;h1 id=&#34;vagus-elidunt&#34;&gt;Vagus elidunt
+&lt;/h1&gt;&lt;p&gt;&lt;svg class=&#34;canon&#34; xmlns=&#34;http://www.w3.org/2000/svg&#34; overflow=&#34;visible&#34; viewBox=&#34;0 0 496 373&#34; height=&#34;373&#34; width=&#34;496&#34;&gt;&lt;g fill=&#34;none&#34;&gt;&lt;path stroke=&#34;#000&#34; stroke-width=&#34;.75&#34; d=&#34;M.599 372.348L495.263 1.206M.312.633l494.95 370.853M.312 372.633L247.643.92M248.502.92l246.76 370.566M330.828 123.869V1.134M330.396 1.134L165.104 124.515&#34;&gt;&lt;/path&gt;&lt;path stroke=&#34;#ED1C24&#34; stroke-width=&#34;.75&#34; d=&#34;M275.73 41.616h166.224v249.05H275.73zM54.478 41.616h166.225v249.052H54.478z&#34;&gt;&lt;/path&gt;&lt;path stroke=&#34;#000&#34; stroke-width=&#34;.75&#34; d=&#34;M.479.375h495v372h-495zM247.979.875v372&#34;&gt;&lt;/path&gt;&lt;ellipse cx=&#34;498.729&#34; cy=&#34;177.625&#34; rx=&#34;.75&#34; ry=&#34;1.25&#34;&gt;&lt;/ellipse&gt;&lt;ellipse cx=&#34;247.229&#34; cy=&#34;377.375&#34; rx=&#34;.75&#34; ry=&#34;1.25&#34;&gt;&lt;/ellipse&gt;&lt;/g&gt;&lt;/svg&gt;&lt;/p&gt;
+&lt;p&gt;&lt;a class=&#34;link&#34; href=&#34;https://en.wikipedia.org/wiki/Canons_of_page_construction#Van_de_Graaf_canon&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;The Van de Graaf Canon&lt;/a&gt;&lt;/p&gt;
+&lt;h2 id=&#34;mane-refeci-capiebant-unda-mulcebat&#34;&gt;Mane refeci capiebant unda mulcebat
+&lt;/h2&gt;&lt;p&gt;Victa caducifer, malo vulnere contra dicere aurato, ludit regale, voca! Retorsit colit est profanae esse virescere furit nec; iaculi matertera et visa est, viribus. Divesque creatis, tecta novat collumque vulnus est, parvas. &lt;strong&gt;Faces illo pepulere&lt;/strong&gt; tempus adest. Tendit flamma, ab opes virum sustinet, sidus sequendo urbis.&lt;/p&gt;
+&lt;p&gt;Iubar proles corpore raptos vero auctor imperium; sed et huic: manus caeli Lelegas tu lux. Verbis obstitit intus oblectamina fixis linguisque ausus sperare Echionides cornuaque tenent clausit possit. Omnia putatur. Praeteritae refert ausus; ferebant e primus lora nutat, vici quae mea ipse. Et iter nil spectatae vulnus haerentia iuste et exercebat, sui et.&lt;/p&gt;
+&lt;p&gt;Eurytus Hector, materna ipsumque ut Politen, nec, nate, ignari, vernum cohaesit sequitur. Vel &lt;strong&gt;mitis temploque&lt;/strong&gt; vocatus, inque alis, &lt;em&gt;oculos nomen&lt;/em&gt; non silvis corpore coniunx ne displicet illa. Crescunt non unus, vidit visa quantum inmiti flumina mortis facto sic: undique a alios vincula sunt iactata abdita! Suspenderat ego fuit tendit: luna, ante urbem Propoetides &lt;strong&gt;parte&lt;/strong&gt;.&lt;/p&gt;</description>
+        </item>
+        <item>
+        <title>Math Typesetting</title>
+        <link>https://zashuole.github-io.git/p/math-typesetting/</link>
+        <pubDate>Fri, 08 Mar 2019 00:00:00 +0000</pubDate>
+        
+        <guid>https://zashuole.github-io.git/p/math-typesetting/</guid>
+        <description>&lt;p&gt;Mathematical notation in a Hugo project can be enabled by using third party JavaScript libraries.&lt;/p&gt;
+&lt;p&gt;In this example we will be using &lt;a class=&#34;link&#34; href=&#34;https://katex.org/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;KaTeX&lt;/a&gt;&lt;/p&gt;
+&lt;ul&gt;
+&lt;li&gt;Create a partial under &lt;code&gt;/layouts/partials/math.html&lt;/code&gt;&lt;/li&gt;
+&lt;li&gt;Within this partial reference the &lt;a class=&#34;link&#34; href=&#34;https://katex.org/docs/autorender.html&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Auto-render Extension&lt;/a&gt; or host these scripts locally.&lt;/li&gt;
+&lt;li&gt;Include the partial in your templates like so:&lt;/li&gt;
+&lt;/ul&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-bash&#34; data-lang=&#34;bash&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;o&#34;&gt;{{&lt;/span&gt; &lt;span class=&#34;k&#34;&gt;if&lt;/span&gt; or .Params.math .Site.Params.math &lt;span class=&#34;o&#34;&gt;}}&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;o&#34;&gt;{{&lt;/span&gt; partial &lt;span class=&#34;s2&#34;&gt;&amp;#34;math.html&amp;#34;&lt;/span&gt; . &lt;span class=&#34;o&#34;&gt;}}&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;&lt;span class=&#34;o&#34;&gt;{{&lt;/span&gt; end &lt;span class=&#34;o&#34;&gt;}}&lt;/span&gt;
+&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;&lt;ul&gt;
+&lt;li&gt;To enable KaTeX globally set the parameter &lt;code&gt;math&lt;/code&gt; to &lt;code&gt;true&lt;/code&gt; in a project&amp;rsquo;s configuration&lt;/li&gt;
+&lt;li&gt;To enable KaTeX on a per page basis include the parameter &lt;code&gt;math: true&lt;/code&gt; in content files&lt;/li&gt;
+&lt;/ul&gt;
+&lt;p&gt;&lt;strong&gt;Note:&lt;/strong&gt; Use the online reference of &lt;a class=&#34;link&#34; href=&#34;https://katex.org/docs/supported.html&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Supported TeX Functions&lt;/a&gt;&lt;/p&gt;
+
+&lt;h3 id=&#34;examples&#34;&gt;Examples
+&lt;/h3&gt;&lt;p&gt;Inline math: $\varphi = \dfrac{1+\sqrt5}{2}= 1.6180339887…$&lt;/p&gt;
+&lt;p&gt;Block math:
+$$
+\varphi = 1+\frac{1} {1+\frac{1} {1+\frac{1} {1+\cdots} } }
+$$&lt;/p&gt;</description>
+        </item>
+        <item>
+        <title>Emoji Support</title>
+        <link>https://zashuole.github-io.git/p/emoji-support/</link>
+        <pubDate>Tue, 05 Mar 2019 00:00:00 +0000</pubDate>
+        
+        <guid>https://zashuole.github-io.git/p/emoji-support/</guid>
+        <description>&lt;img src="https://zashuole.github-io.git/p/emoji-support/the-creative-exchange-d2zvqp3fpro-unsplash.jpg" alt="Featured image of post Emoji Support" /&gt;&lt;p&gt;Emoji can be enabled in a Hugo project in a number of ways.&lt;/p&gt;
+&lt;p&gt;The &lt;a class=&#34;link&#34; href=&#34;https://gohugo.io/functions/emojify/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;&lt;code&gt;emojify&lt;/code&gt;&lt;/a&gt; function can be called directly in templates or &lt;a class=&#34;link&#34; href=&#34;https://gohugo.io/templates/shortcode-templates/#inline-shortcodes&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Inline Shortcodes&lt;/a&gt;.&lt;/p&gt;
+&lt;p&gt;To enable emoji globally, set &lt;code&gt;enableEmoji&lt;/code&gt; to &lt;code&gt;true&lt;/code&gt; in your site&amp;rsquo;s &lt;a class=&#34;link&#34; href=&#34;https://gohugo.io/getting-started/configuration/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;configuration&lt;/a&gt; and then you can type emoji shorthand codes directly in content files; e.g.&lt;/p&gt;
+&lt;p&gt;&lt;span class=&#34;nowrap&#34;&gt;&lt;span class=&#34;emojify&#34;&gt;🙈&lt;/span&gt; &lt;code&gt;:see_no_evil:&lt;/code&gt;&lt;/span&gt;  &lt;span class=&#34;nowrap&#34;&gt;&lt;span class=&#34;emojify&#34;&gt;🙉&lt;/span&gt; &lt;code&gt;:hear_no_evil:&lt;/code&gt;&lt;/span&gt;  &lt;span class=&#34;nowrap&#34;&gt;&lt;span class=&#34;emojify&#34;&gt;🙊&lt;/span&gt; &lt;code&gt;:speak_no_evil:&lt;/code&gt;&lt;/span&gt;&lt;/p&gt;
+&lt;br&gt;
+&lt;p&gt;The &lt;a class=&#34;link&#34; href=&#34;http://www.emoji-cheat-sheet.com/&#34;  target=&#34;_blank&#34; rel=&#34;noopener&#34;
+    &gt;Emoji cheat sheet&lt;/a&gt; is a useful reference for emoji shorthand codes.&lt;/p&gt;
+&lt;hr&gt;
+&lt;p&gt;&lt;strong&gt;N.B.&lt;/strong&gt; The above steps enable Unicode Standard emoji characters and sequences in Hugo, however the rendering of these glyphs depends on the browser and the platform. To style the emoji you can either use a third party emoji font or a font stack; e.g.&lt;/p&gt;
+&lt;div class=&#34;highlight&#34;&gt;&lt;div class=&#34;chroma&#34;&gt;
+&lt;table class=&#34;lntable&#34;&gt;&lt;tr&gt;&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code&gt;&lt;span class=&#34;lnt&#34;&gt;1
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;2
+&lt;/span&gt;&lt;span class=&#34;lnt&#34;&gt;3
+&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;
+&lt;td class=&#34;lntd&#34;&gt;
+&lt;pre tabindex=&#34;0&#34; class=&#34;chroma&#34;&gt;&lt;code class=&#34;language-html&#34; data-lang=&#34;html&#34;&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;.emoji {
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;  font-family: Apple Color Emoji, Segoe UI Emoji, NotoColorEmoji, Segoe UI Symbol, Android Emoji, EmojiSymbols;
+&lt;/span&gt;&lt;/span&gt;&lt;span class=&#34;line&#34;&gt;&lt;span class=&#34;cl&#34;&gt;}&lt;/span&gt;&lt;/span&gt;&lt;/code&gt;&lt;/pre&gt;&lt;/td&gt;&lt;/tr&gt;&lt;/table&gt;
+&lt;/div&gt;
+&lt;/div&gt;</description>
+        </item>
+        
+    </channel>
+</rss>
